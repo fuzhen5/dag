@@ -22,5 +22,14 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/wangfuzhen/.m2/repository/org/jgrapht/jgrapht-core/1.0.1/jgrapht-core-1.0.1.jar" sourcepath="C:/Users/wangfuzhen/.m2/repository/org/jgrapht/jgrapht-core/1.0.1/jgrapht-core-1.0.1-sources.jar">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+			<attribute name="maven.groupId" value="org.jgrapht"/>
+			<attribute name="maven.artifactId" value="jgrapht-core"/>
+			<attribute name="maven.version" value="1.0.1"/>
+			<attribute name="maven.scope" value="compile"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

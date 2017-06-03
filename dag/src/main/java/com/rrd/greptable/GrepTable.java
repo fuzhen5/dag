@@ -19,57 +19,115 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.rrd.dag.DAG;
+import org.jgrapht.experimental.dag.DirectedAcyclicGraph;
+//import org.jgrapht.graph.DefaultEdge;
+import com.rrd.dag.DefaultEdge;
 
 public class GrepTable {
 	
 	public static void main(String[] args) throws Exception {
-//		if(args ==null || args.length < 1) {
-//			System.out.println("please input file: ");
-//			System.exit(-1);
-//		}
-//		String path = args[0];
-//		Map<String,Set<String>> map = parseTable(readFile(path));
-//		
-//		//遍历map,取出所有元素
-//		for(Map.Entry<String, Set<String>> entry : map.entrySet()) {
-//			// 取出母表
-//			String originTable = entry.getKey();
-//			System.out.println(originTable);
-//			for(String table : entry.getValue()) {
-//				System.out.println("  " + table);
-//			}
-//		}
+		if(args ==null || args.length < 1) {
+			System.out.println("please input file: ");
+			System.exit(-1);
+		}
+		String path = args[0];
+
+		DirectedAcyclicGraph<String, DefaultEdge> dag = new DirectedAcyclicGraph<String, DefaultEdge>(DefaultEdge.class);
+		dag = getDAG(path);
 		
+		DirectedAcyclicGraph<String, DefaultEdge> part = searchTable(dag,"gdm_user_channel");
+		System.out.println(part.edgeSet().toString());
+	}
+	
+	/**
+	 * 创建指定表的DAG
+	 * @param dag
+	 * @param tbl
+	 * @return
+	 */
+	public static DirectedAcyclicGraph<String, DefaultEdge> searchTable(
+			DirectedAcyclicGraph<String, DefaultEdge> dag, String tbl) {
+		DirectedAcyclicGraph<String, DefaultEdge> tblDag = new DirectedAcyclicGraph<String, DefaultEdge>(DefaultEdge.class);
 		
+		//前驱
+		extractDag(dag.getAncestors(dag, tbl),tbl,dag,tblDag);
 		
-		Map<String,Set<String>> map = getTotalTableMap("E:/rrd/new_repo/data-warehouse/dw_project");
-		DAG dag = new DAG();
+		//后继
+		extractDag(dag.getDescendants(dag, tbl),tbl,dag,tblDag);
+		return tblDag;
+	}
+	
+	/**
+	 * 在partDag中创建dag中指定顶点，及其前驱或后继中的边
+	 * @param set
+	 * @param tbl
+	 * @param dag
+	 * @param partDag
+	 */
+	public static void extractDag(Set<String> set, String tbl,
+			DirectedAcyclicGraph<String, DefaultEdge> dag, 
+			DirectedAcyclicGraph<String, DefaultEdge> partDag) {
+		set.add(tbl);
+		Object[] arr = set.toArray();
+		for(int i = 0; i < arr.length; i++) {
+			partDag.addVertex((String) arr[i]);
+		}
+		
+		for(int i = 0; i < arr.length; i++) {
+			for(int j = 0; j < arr.length; j++) {
+				if(j == i) {
+					continue;
+				}
+				addEdge(dag,partDag,(String)arr[i],(String)arr[j]);
+			}
+		}
+	}
+	
+
+	/**
+	 * 根据指定的两个定点以及一个DAG，来判断是否存在边，如果 存在 边，则添加到新的DAG中
+	 * @param dag       全局DAG
+	 * @param partDag   局部DAG
+	 * @param sourceVertex  定点
+	 * @param targetVertex  定点
+	 */
+	private static void  addEdge(DirectedAcyclicGraph<String, DefaultEdge> dag, 
+			DirectedAcyclicGraph<String, DefaultEdge> partDag,
+			String sourceVertex, String targetVertex) {
+		if(dag.containsEdge(sourceVertex, targetVertex)) {
+			partDag.addEdge(sourceVertex, targetVertex);
+		}
+	}
+	
+
+	/**
+	 * 根据文件中提取出的全表Map,构建DAG
+	 * @param path
+	 * @return
+	 * @throws Exception
+	 */
+	public static DirectedAcyclicGraph<String, DefaultEdge> getDAG(String path) throws Exception {
+		DirectedAcyclicGraph<String, DefaultEdge> dag = new DirectedAcyclicGraph<String, DefaultEdge>(DefaultEdge.class);
+		Map<String,Set<String>> map = getTotalTableMap(path);
 		
 		//遍历map,取出所有元素
 		for(Map.Entry<String, Set<String>> entry : map.entrySet()) {
+			
 			// 取出母表
 			String originTable = entry.getKey();
-			System.out.println(originTable);
+			if(originTable == null || originTable.equals("")) {
+				continue;
+			}
+//			System.out.println(originTable);
 			dag.addVertex(originTable);
+			
 			for(String table : entry.getValue()) {
-				System.out.println("  " + table);
-				dag.addEdge(originTable, table);
+				dag.addVertex(table);
+				dag.addEdge(table,originTable);
+//				System.out.println("-- " + table);
 			}
 		}
-		
-		System.out.println(map.size());
-		
-//		for(Map.Entry<String,Set<String>> entry : map.entrySet()) {
-//			String key = entry.getKey();
-//			dag.addVertex(key);
-//			for(String table : entry.getValue()) {
-//				dag.addEdge(key, table);
-//			}
-//		}
-		
-//		System.out.println(dag.toString());
-		
+		return dag ;
 	}
 	
 	
@@ -89,8 +147,6 @@ public class GrepTable {
 		br.close();
 		return sb.toString();
 	}
-	
-	
 	
 	/**
 	 * 从字符串中，匹配出表，梳理表与表之间关系，并将上游表作为key，下游表列表作为value保存在map中
@@ -112,7 +168,10 @@ public class GrepTable {
 			key = m1.group(1);
 		}
 		while(m2.find()) {
-			list.add(m2.group(2));
+			String  value = m2.group(2);
+			if(! key.equalsIgnoreCase(value)) {
+				list.add(m2.group(2));
+			}
 		}
 		map.put(key, list);
 		return map;
@@ -153,18 +212,27 @@ public class GrepTable {
 		return all;
 	}
 	
+	/**
+	 * 
+	 * @param total    全局Map,保存着全局的关系
+	 * @param tblName  要查找的表名称
+	 * @return         返回要查找表的对应关系
+	 */
 	public static Map<String,Set<String>> getOneTableMap(Map<String,Set<String>> total, String tblName) {
 		
 		Map<String,Set<String>> map = new HashMap<String,Set<String>>();
-		
+		// 递归停止的条件 
+		if(! total.containsKey(tblName) || total.get(tblName) == null || total.size() == 0) {
+			return map;
+		}
+
 		// 找到该表对应的set
 		Set<String> value = total.get(tblName);
 		for(String tbl : value) {
-			if(total.containsKey(tbl) && total.get(tbl) != null && total.size() > 0) {
-				
-			}
+			map = getOneTableMap(total,tbl);
 		}
 		
 		return map;
 	}
+	
 }
